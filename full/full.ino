@@ -4,6 +4,12 @@
 #include <SPIFlash.h>    //get it here: https://github.com/LowPowerLab/SPIFlash
 #include <SPI.h>
 
+#define PRESSURE_THRESHOLD 800
+#define START_TIME_THRESHOLD 16000
+#define END_TIME_THRESHOLD 20000
+#define PRESSURE_DERIVATE_THRESHOLD 10
+
+
 int good;
 
 int cs_pre=18;
@@ -12,9 +18,24 @@ int cs_imu=15;
 int int_pre=17;
 int int_imu=16;
 
+int opto_1 = 2;
+int opto_2 = 3;
+int opto_3 = 4;
+int opto_4 = 5;
+int opto_5 = 6;
+int opto_6 = 7;
+int opto_7 = 8;
+int opto_8 = 9;
 
+bool have_launched=false;
+bool have_opened_para=false;
+bool is_pressure_under_threshold=false;
+bool is_in_accepted_tempo_zone=false;
+bool is_pressure_derivative_null=false;
 
-volatile float temperature, pressure, altitude;              // Create the temperature, pressure and altitude variables
+int JackPin = 20;
+
+volatile float temperature, pressure,last_pressure,pressure_delta_moyenne , altitude;              // Create the temperature, pressure and altitude variables
 volatile boolean PreDataReady = false;   
 BMP388_DEV bmp388(cs_pre);                              // Instantiate (create) a BMP388_DEV object and set-up for SPI operation on digital pin D10
 
@@ -30,6 +51,7 @@ volatile uint32_t addresse;
 SPIFlash flash(cs_flash);
 
 IntervalTimer myTimer;
+IntervalTimer myTimer2;
 
 bool printSerial=false;
 
@@ -43,6 +65,25 @@ void setup()
   digitalWrite(cs_flash, HIGH);
   pinMode(cs_imu, OUTPUT);
   digitalWrite(cs_imu, HIGH);
+
+  pinMode(opto_1, OUTPUT);
+  pinMode(opto_2, OUTPUT);
+  pinMode(opto_3, OUTPUT);
+  pinMode(opto_4, OUTPUT);
+  pinMode(opto_5, OUTPUT);
+  pinMode(opto_6, OUTPUT);
+  pinMode(opto_7, OUTPUT);
+  pinMode(opto_8, OUTPUT);
+  pinMode(JackPin, INPUT);
+
+  digitalWrite(opto_1, HIGH);
+  digitalWrite(opto_2, LOW);
+  digitalWrite(opto_3, LOW);
+  digitalWrite(opto_4, LOW);
+  digitalWrite(opto_5, LOW);
+  digitalWrite(opto_6, LOW);
+  digitalWrite(opto_7, LOW);
+  digitalWrite(opto_8, LOW);
 
   
   Serial.begin(115200);   
@@ -121,6 +162,9 @@ void setup()
     bmp388.startNormalConversion();         // Start BMP388 continuous conversion in NORMAL_MODE
     
     myTimer.begin(FlashInterruptHandler, 50000);
+    myTimer.priority(120);
+    myTimer2.begin(OptoInterruptHandler, 5000);
+    myTimer2.priority(150);
     interrupts();
   }
   else{
@@ -196,6 +240,9 @@ void loop()
 void PreInterruptHandler()                               // Interrupt service routine (ISR)
 {   
   bmp388.getMeasurements(temperature, pressure, altitude);   // Get the data
+  pressure_delta_moyenne += ( pressure - last_pressure );
+  pressure_delta_moyenne -= pressure_delta_moyenne/10; // Calculation of the pressure derivative with a low pass filter
+  last_pressure= pressure;
   PreDataReady = true;                               // Set the data ready flag
 
 }
@@ -240,6 +287,51 @@ void FlashInterruptHandler(){
       flash.writeByte(0,(addresse&0x0000FF));
       flash.writeByte(1,(addresse&0x00FF00)>>8);
       flash.writeByte(2,(addresse&0xFF0000)>>16);
+}
+
+void OptoInterruptHandler(){
+
+if((digitalRead(JackPin))) {
+  digitalWrite(opto_2, HIGH); // Cable jack connecté
+} else {
+  digitalWrite(opto_2, LOW);  
+  if(!have_launched){
+    have_launched=true;
+    launch_time = millis()
+  }
+}
+
+if(pressure<PRESSURE_THRESHOLD){
+  is_pressure_under_threshold=true;
+  digitalWrite(opto_3, HIGH); // Pression sous le seuil de déploiement
+} else {
+  is_pressure_under_threshold=false;
+  digitalWrite(opto_3, LOW);  
+}
+
+if(have_launched && ( (millis()-launch_time> START_TIME_THRESHOLD) && (millis()-launch_time < END_TIME_THRESHOLD) ) ){
+  is_in_accepted_tempo_zone=true;
+  digitalWrite(opto_4, HIGH); // Zone temporelle déploiement accéptée
+} else{
+  is_in_accepted_tempo_zone=false;
+  digitalWrite(opto_4, LOW);  
+}
+
+if(pressure_delta_moyenne<PRESSURE_DERIVATE_THRESHOLD){
+  is_pressure_derivative_null=true;
+  digitalWrite(opto_5, HIGH); // Dérivée barometre nulle
+} else{
+  is_pressure_derivative_null=false;
+  digitalWrite(opto_5, LOW);  
+}
+
+if( have_launched && (!have_opened_para) && ((is_pressure_under_threshold && is_in_accepted_tempo_zone && is_pressure_derivative_null) || (millis()-launch_time >= END_TIME_THRESHOLD) ) ){
+  have_opened_para=true;
+  //open parachute
+  digitalWrite(opto_6, HIGH); // Commande déploiement envoyée
+} 
+
+
 }
 
 void writeFloatToFlash(float data,uint32_t  addresse){
