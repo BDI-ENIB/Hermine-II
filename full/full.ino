@@ -27,6 +27,8 @@ int opto_6 = 7;
 int opto_7 = 8;
 int opto_8 = 9;
 
+int launch_time=0;
+
 bool have_launched=false;
 bool have_opened_para=false;
 bool is_pressure_under_threshold=false;
@@ -161,9 +163,9 @@ void setup()
     myMPU6500.enableInterrupt(MPU6500_DATA_READY );
     bmp388.startNormalConversion();         // Start BMP388 continuous conversion in NORMAL_MODE
     
-    myTimer.begin(FlashInterruptHandler, 50000);
+    myTimer.begin(FlashInterruptHandler, 500000);
     myTimer.priority(120);
-    myTimer2.begin(OptoInterruptHandler, 5000);
+    //myTimer2.begin(OptoInterruptHandler, 5000);
     myTimer2.priority(150);
     interrupts();
   }
@@ -297,7 +299,7 @@ if((digitalRead(JackPin))) {
   digitalWrite(opto_2, LOW);  
   if(!have_launched){
     have_launched=true;
-    launch_time = millis()
+    launch_time = millis();
   }
 }
 

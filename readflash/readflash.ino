@@ -128,8 +128,8 @@ void loop() {
    else{
     count255=0;
     blockstart=addresse;
-    Serial.print("nouveau block:");
-    Serial.println(blockstart);
+    Serial.print(blockstart);
+    Serial.print(",");
     }
     if (count255<5){
       /*
@@ -143,29 +143,27 @@ void loop() {
         
         float resultant = 0.0;
         resultant = sqrt(sq(ax2) + sq(ay2) + sq(az2));
-        Serial.println("Acceleration in g (x,y,z):");
         Serial.print(ax2);
+        Serial.print(",");
         //Serial.print(sizeof(ax2));
-        Serial.print("   ");
         Serial.print(ay2);
-        Serial.print("   ");
-        Serial.println(az2);
-        Serial.print("Resultant g: ");
-        Serial.println(resultant);
+        Serial.print(",");
+        Serial.print(az2);
+        Serial.print(",");
+        Serial.print(resultant);
       
-        Serial.println("Gyroscope data in degrees/s: ");
+        Serial.print(",");
         Serial.print(gx2);
-        Serial.print("   ");
+        Serial.print(",");
         Serial.print(gy2);
-        Serial.print("   ");
-        Serial.println(gz2);
+        Serial.print(",");
+        Serial.print(gz2);
 
         
-        Serial.println("barometre");
-        Serial.print(temperature);                        
-        Serial.print(F("*C   "));
-        Serial.print(pressure);    
-        Serial.println(F("hPa   "));
+        Serial.print(",");
+        Serial.print(temperature);     
+        Serial.print(",");
+        Serial.println(pressure);    
         
     }
     else{
